@@ -1,146 +1,92 @@
 #define _CRT_SECURE_NO_WARNINGS
 typedef int QDataType;
-typedef struct QNode//定义队列的节点
+//这里用数组实现循环队列
+typedef struct
 {
-    struct QNode* next;
-    QDataType x;
-}QNode;
-
-typedef struct //定义一个队列
-{
-    QNode* phead;//队头
-    QNode* tail;//队尾
-    int capacity;//容量
-    int size;//已有的节点数
+    QDataType* data;//存储数据的数组
+    int capacity;//循环队列的容量
+    int head;//头部元素下标
+    int tail;//尾部元素下标 tail指向最后一个数据的下一个位置
 } MyCircularQueue;
 
-bool myCircularQueueIsEmpty(MyCircularQueue* obj)
-{
-    assert(obj);
-    if (obj->phead == NULL)
-        return true;
-    return false;
-}
 
-MyCircularQueue* myCircularQueueCreate(int k)//队列的初始化 
+MyCircularQueue* myCircularQueueCreate(int k) //循环队列的初始化
 {
     MyCircularQueue* re = (MyCircularQueue*)malloc(sizeof(MyCircularQueue));
-    //申请一个空间存放队列
-    assert(re);
-    re->phead = re->tail = NULL;
-    re->capacity = k;
-    re->size = 0;
+    //开辟多一个空间，便于判断队列满的情况，一般tail == head为空，tail+1 == head为满
+    re->data = (QDataType*)malloc(sizeof(QDataType) * (k + 1));
+    re->head = re->tail = 0;
+    re->capacity = k + 1;
     return re;
-}
-
-bool myCircularQueueEnQueue(MyCircularQueue* obj, int value)
-{
-    assert(obj);
-    if (obj->size == obj->capacity)//队列已满
-        return false;
-    QNode* newNode = (QNode*)malloc(sizeof(QNode));//申请节点并初始化
-    if (newNode == NULL)
-        return false;
-    newNode->x = value;
-    newNode->next = NULL;
-    if (obj->phead == NULL)//队列无节点
-    {
-        obj->phead = obj->tail = newNode;
-        newNode->next = obj->phead;
-        obj->size++;
-        return true;
-    }
-    else
-    {
-        obj->tail->next = newNode;
-        obj->tail = newNode;
-        obj->tail->next = obj->phead;
-        obj->size++;
-        return true;
-    }
-}
-
-bool myCircularQueueDeQueue(MyCircularQueue* obj)
-{
-    assert(obj);
-    if (myCircularQueueIsEmpty(obj))//队列为空
-        return false;
-    if (obj->phead == obj->tail)//只有一个节点
-    {
-        free(obj->phead);
-        obj->phead = obj->tail = NULL;
-        obj->size--;
-        return true;
-    }
-    else
-    {
-        QNode* newHead = obj->phead->next;
-        free(obj->phead);
-        obj->phead = newHead;
-        obj->tail->next = obj->phead;
-        obj->size--;
-        return true;
-    }
-}
-
-int myCircularQueueFront(MyCircularQueue* obj)
-{
-    assert(obj);
-    if (myCircularQueueIsEmpty(obj))
-        return -1;
-    else
-        return obj->phead->x;
-}
-
-int myCircularQueueRear(MyCircularQueue* obj)
-{
-    assert(obj);
-    if (myCircularQueueIsEmpty(obj))
-        return -1;
-    return obj->tail->x;
 }
 
 bool myCircularQueueIsFull(MyCircularQueue* obj)
 {
-    assert(obj);
-    return obj->size == obj->capacity;
+    if (obj->tail + 1 == obj->capacity)
+        return obj->head == 0;
+    else
+        return obj->head == obj->tail + 1;
+}
+
+bool myCircularQueueIsEmpty(MyCircularQueue* obj)
+{
+    return obj->head == obj->tail;
 }
 
 void myCircularQueueFree(MyCircularQueue* obj)
 {
-    assert(obj);
-    if (obj->phead == NULL)
-    {
-        free(obj);
-        obj = NULL;
-        return;
-    }
-    QNode* cur = obj->phead->next;
-    while (cur != obj->phead)
-    {
-        QNode* next = cur->next;
-        free(cur);
-        cur = next;
-    }
-    free(obj->phead);
+    free(obj->data);
     free(obj);
-    obj = NULL;
 }
 
-/**
- * Your MyCircularQueue struct will be instantiated and called as such:
- * MyCircularQueue* obj = myCircularQueueCreate(k);
- * bool param_1 = myCircularQueueEnQueue(obj, value);
+bool myCircularQueueEnQueue(MyCircularQueue* obj, int value)//队尾入队列 
+{
+    //如果队列满了，入队列失败
+    if (myCircularQueueIsFull(obj))
+        return false;
+    //1 正常情况下
+    //obj->data[obj->tail] = value;
+    //obj->tail++;
+    //2 若tail++变为k+1，则要把tail置0
+    //if(obj->tail == obj->capacity)
+        //obj->tail = 0;
+    obj->data[obj->tail++] = value;
+    obj->tail %= obj->capacity;
+    return true;
+}
 
- * bool param_2 = myCircularQueueDeQueue(obj);
+bool myCircularQueueDeQueue(MyCircularQueue* obj)//队头出队列 
+{
+    //如果队列为空，出队列失败
+    if (myCircularQueueIsEmpty(obj))
+        return false;
+    //正常情况下，只需++head,忽略掉原来的数据
+    ++obj->head;
+    //如果head后来>k,也要置0
+    if (obj->head == obj->capacity)
+        obj->head = 0;
+    //或者head % (k+1)
+    return true;
+}
 
- * int param_3 = myCircularQueueFront(obj);
+int myCircularQueueFront(MyCircularQueue* obj)
+{
+    if (myCircularQueueIsEmpty(obj))
+        return -1;
+    return obj->data[obj->head];
+}
 
- * int param_4 = myCircularQueueRear(obj);
+int myCircularQueueRear(MyCircularQueue* obj)
+{
+    if (myCircularQueueIsEmpty(obj))
+        return -1;
+    //因为队尾元素在tail的上一个下标位置
+    //1 tail - 1 == -1
+    //2 正常返回
+    if (obj->tail - 1 == -1)
+        return obj->data[obj->capacity - 1];
+    else
+        return obj->data[obj->tail - 1];
 
- * bool param_5 = myCircularQueueIsEmpty(obj);
+}
 
- * bool param_6 = myCircularQueueIsFull(obj);
-
- * myCircularQueueFree(obj);
-*/
